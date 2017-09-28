@@ -8,7 +8,7 @@
 The metadata come from [RePEc](ftp://ftp.repec.org/opt/ReDIF/RePEc/), where they are held in [ReDIF](http://openlib.org/acmes/root/docu/redif_1.html) files. The code extracts information from these text files by first scraping their content through rvest and then making use of regularities in the text to separate article information. 
 
 For each article, the generated dataset should contain (where available):
-    * A list of authors
+    ..* A list of authors
     * Title
     * Abstract
     * Volume, Issue, Pages
