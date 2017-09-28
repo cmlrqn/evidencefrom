@@ -1,4 +1,4 @@
-# Rvesting information on Top 5 (AER, QJE, JPE, Ecme [wiley and pre-wiley], REStud) using RePEc metadata. 
+# Rvesting information on Top 5 (AER, QJE, JPE, Ecta [wiley and pre-wiley], REStud) using RePEc metadata. 
 # Citation data from google scholar not included, can be appended with rPython - see Card and Della Vigna (2013)  
 
 
@@ -18,7 +18,7 @@ remove(list = ls())
 
 #EconPapers Journal IDs
 #AER = "aea/aecrev"        JPE = "ucp/jpolec"     QJE = "oup/qjecon"        
-#REStud = "oup/restud"     Ecme = "ecm/emetrp"    Ecme_w = "wly/emetrp"
+#REStud = "oup/restud"     Ecta = "ecm/emetrp"    Ecta_w = "wly/emetrp"
 
 #==== 1. QJE ====
 #Coverage: All volumes.
@@ -107,8 +107,7 @@ for (yr in qjefiles) { #People of the future - you'll have to replace the latest
       foo2 <- gsub(" ," , "," ,  foo2)
       foo2 <- trimws(foo2, which = c("both"))
       foo2 <- unlist(strsplit(foo2, ", "))
-      foo3 <- article_list[[m]]
-      foo3 <- foo3[!grepl("File-Format|File-Restriction|Classification-JEL|Keywords:|Author-Name:", foo3)]
+      foo3 <- article_list[[m]][- grepl("Author-Name:", article_list[[m]])] 
       foo3 <- c(foo2, foo3)
       foo4 <- data.frame(t(foo3))
       names_list <- c("URL", "Year", "Volume", "Issue", "Pages", "Journal", "Abstract", "Title")
@@ -244,8 +243,7 @@ for (yr in restudfiles) {
       foo2 <- gsub(" ," , "," ,  foo2)
       foo2 <- trimws(foo2, which = c("both"))
       foo2 <- unlist(strsplit(foo2, ", "))
-      foo3 <- article_list[[m]]
-      foo3 <- foo3[!grepl("File-Format|File-Restriction|Classification-JEL|Keywords:|Author-Name:", foo3)]
+      foo3 <- article_list[[m]][- grepl("Author-Name:", article_list[[m]])] 
       foo3 <- c(foo2, foo3)
       foo4 <- data.frame(t(foo3))
       names_list <- c("URL", "Year", "Volume", "Issue", "Pages", "Journal", "Abstract", "Title")
@@ -378,8 +376,7 @@ for (yr in aerfiles) { #People of the future - you'll have to replace the latest
        foo2 <- gsub(" ," , "," ,  foo2)
        foo2 <- trimws(foo2, which = c("both"))
        foo2 <- unlist(strsplit(foo2, ", "))
-       foo3 <- article_list[[m]]
-       foo3 <- foo3[!grepl("File-Format|File-Restriction|Classification-JEL|Keywords:|Author-Name:", foo3)]
+       foo3 <- article_list[[m]][- grepl("Author-Name:", article_list[[m]])] 
        foo3 <- c(foo2, foo3)
        foo4 <- data.frame(t(foo3))
        names_list <- c("URL", "Year", "Volume", "Issue", "Pages", "Journal", "Abstract", "Title")
@@ -512,8 +509,7 @@ for (yr in jpefiles) { #People of the future - you'll have to replace the latest
       foo2 <- gsub(" ," , "," ,  foo2)
       foo2 <- trimws(foo2, which = c("both"))
       foo2 <- unlist(strsplit(foo2, ", "))
-      foo3 <- article_list[[m]][- grep("Author-Name:", article_list[[m]])]
-      foo3 <- foo3[!grepl("File-Format|File-Restriction|Classification-JEL|Keywords:", foo3)]
+      foo3 <- article_list[[m]][- grepl("Author-Name:", article_list[[m]])] 
       foo3 <- c(foo2, foo3)
       foo4 <- data.frame(t(foo3))
       names_list <- c("URL", "Year", "Volume", "Issue", "Pages", "Journal", "Abstract", "Title")
@@ -660,8 +656,7 @@ for (yr in ectafiles) { #People of the future - you'll have to replace the lates
       foo2 <- gsub(" ," , "," ,  foo2)
       foo2 <- trimws(foo2, which = c("both"))
       foo2 <- unlist(strsplit(foo2, ", "))
-      foo3 <- article_list[[m]]
-      foo3 <- foo3[!grepl("File-Format|File-Restriction|Classification-JEL|Keywords:|Author-Name:", foo3)]
+      foo3 <- article_list[[m]][- grepl("Author-Name:", article_list[[m]])] 
       foo3 <- c(foo2, foo3)
       foo4 <- data.frame(t(foo3))
       names_list <- c("URL", "Year", "Volume", "Issue", "Pages", "Journal", "Abstract", "Title")
