@@ -1,7 +1,10 @@
 # Rvesting information on Top 5 (AER, QJE, JPE, Ecme [wiley and pre-wiley], REStud) using RePEc metadata. 
 # Citation data from google scholar not included, can be appended with rPython - see Card and Della Vigna (2013)  
 
-require('rvest')
+
+necessarypkgs <- c("ggplot2", "rvest", "plyr", "curl", "psych")
+toinstall <- necessarypkgs[!(necessarypkgs %in% installed.packages()[,"Package"])]
+if(length(toinstall)!=0) install.packages(toinstall)
 
 library('rvest')
 library('curl')
@@ -9,29 +12,24 @@ library('psych')
 library('plyr')
 library('ggplot2')
 
-setwd("/Work/Research/evidence from")
-
-#EconPapers Journal IDs
-#AER    = "aea/aecrev"
-#JPE    = "ucp/jpolec"
-#QJE    = "oup/qjecon"
-#REStud = "oup/restud"
-#Ecme   = "ecm/emetrp"
-#Ecme_w = "wly/emetrp"
+setwd(dirname(file.choose()))
 
 remove(list = ls())
 
-############## QJE ################
+#EconPapers Journal IDs
+#AER = "aea/aecrev"        JPE = "ucp/jpolec"     QJE = "oup/qjecon"        
+#REStud = "oup/restud"     Ecme = "ecm/emetrp"    Ecme_w = "wly/emetrp"
+
+#==== 1. QJE ====
+#Coverage: All volumes.
 #For some reason 2011-2014 QJE articles have a format different from the other ~130 years.
 
-#This is the final frame in which all articles will be held. 
 qjefiles <- c(paste0("qjecon_", 1886:2010), paste0("qjecon_", 2015:2017), 
               "qje_2014", paste0(1261:1264, "-qjecon"), 
               paste0(1271:1274, "-qjecon"), paste0(1281:1284, "-qjecon"))
 
 df_articles = data.frame()
 
-#Loop for most years.
 for (yr in qjefiles) { #People of the future - you'll have to replace the latest year.
   
   urli <- paste0("ftp://ftp.repec.org/opt/ReDIF/RePEc/oup/qjecon/", yr, ".rdf")
@@ -109,9 +107,8 @@ for (yr in qjefiles) { #People of the future - you'll have to replace the latest
       foo2 <- gsub(" ," , "," ,  foo2)
       foo2 <- trimws(foo2, which = c("both"))
       foo2 <- unlist(strsplit(foo2, ", "))
-      foo3 <- article_list[[m]][- grep("Author-Name:", article_list[[m]])]
-      #Is line 111 necessary? Can we not simply add Author-Name: to the grepl below?
-      foo3 <- foo3[!grepl("File-Format|File-Restriction|Classification-JEL|Keywords:", foo3)]
+      foo3 <- article_list[[m]]
+      foo3 <- foo3[!grepl("File-Format|File-Restriction|Classification-JEL|Keywords:|Author-Name:", foo3)]
       foo3 <- c(foo2, foo3)
       foo4 <- data.frame(t(foo3))
       names_list <- c("URL", "Year", "Volume", "Issue", "Pages", "Journal", "Abstract", "Title")
@@ -161,16 +158,16 @@ rm(list = ls(pattern = "article"))
 
 save(qje_df, file = "ReDif/qje_repec.Rdata")
 
-############## REStud ################
-
-df_articles = data.frame()
+#==== 2. REStud ====
+#Coverage: All volumes.
 
 #People of the future - you'll have to replace the latest year.
 restudfiles <- c(paste0("restud_", 1933:2001),paste0("restud_", 2015:2017), "restud_2014_2", "restud_81_3_4")
 restudfiles <- c(paste0("ftp://ftp.repec.org/opt/ReDIF/RePEc/oup/restud/", restudfiles, ".rdf"), 
                  "ftp://ftp.repec.org/opt/ReDIF/RePEc/oup/restud/restud_uniqueE329.rdf")
 
-#Loop for most years.
+df_articles = data.frame()
+
 for (yr in restudfiles) { 
   
   url <- html_text(read_html(yr))
@@ -247,9 +244,8 @@ for (yr in restudfiles) {
       foo2 <- gsub(" ," , "," ,  foo2)
       foo2 <- trimws(foo2, which = c("both"))
       foo2 <- unlist(strsplit(foo2, ", "))
-      foo3 <- article_list[[m]][- grep("Author-Name:", article_list[[m]])]
-      #Is line 111 necessary? Can we not simply add Author-Name: to the grepl below?
-      foo3 <- foo3[!grepl("File-Format|File-Restriction|Classification-JEL|Keywords:", foo3)]
+      foo3 <- article_list[[m]]
+      foo3 <- foo3[!grepl("File-Format|File-Restriction|Classification-JEL|Keywords:|Author-Name:", foo3)]
       foo3 <- c(foo2, foo3)
       foo4 <- data.frame(t(foo3))
       names_list <- c("URL", "Year", "Volume", "Issue", "Pages", "Journal", "Abstract", "Title")
@@ -290,7 +286,6 @@ sum(is.na(restud_df$Year))
 restud_df$Year[is.na(restud_df$Year) & restud_df$Volume >= 84] <- 2017 #Articles from recent volume are missing year 
 
 restud_df$Volume <- as.numeric(restud_df$Volume)
-#restud_df$Issue <- as.numeric(restud_df$Issue) There is a Supplement issue in 1985, let us keep it named as Supplement. 
 restud_df <- restud_df[with(restud_df, order(Year, Volume, Issue)),] 
 
 #Cleaning up
@@ -300,10 +295,9 @@ rm(list = ls(pattern = "article"))
 
 save(restud_df, file = "ReDif/restud_repec.Rdata")
 
-############## AER ################
+#==== 3. AER ====
+#Coverage: 1969 onwards (AER start: 1911)
 
-#This is the final frame in which all articles will be held. 
-df_articles = data.frame()
 
 aerfiles <- gsub(" ", "", c(
     apply(expand.grid("AER_", 89:100, "0", 1:5), 1, paste, collapse=""), apply(expand.grid("AER_", 101:103, "0", 1:7), 1, paste, collapse=""),
@@ -311,6 +305,8 @@ aerfiles <- gsub(" ", "", c(
     apply(expand.grid("AER_", 107,"0", 1:9), 1, paste, collapse=""), c(paste0("p", 1:8, "aer"), paste0("q", 1:9, "aer"), 
     paste0("r", 1:9, "aer"), paste0("s", 1:4, "aer"))
     ))
+
+df_articles = data.frame()
 
 for (yr in aerfiles) { #People of the future - you'll have to replace the latest file.
   urli <- paste0("ftp://ftp.repec.org/opt/ReDIF/RePEc/aea/aecrev/", yr, ".rdf")
@@ -382,8 +378,8 @@ for (yr in aerfiles) { #People of the future - you'll have to replace the latest
        foo2 <- gsub(" ," , "," ,  foo2)
        foo2 <- trimws(foo2, which = c("both"))
        foo2 <- unlist(strsplit(foo2, ", "))
-       foo3 <- article_list[[m]][- grep("Author-Name:", article_list[[m]])]
-       foo3 <- foo3[!grepl("File-Format|File-Restriction|Classification-JEL|Keywords:", foo3)]
+       foo3 <- article_list[[m]]
+       foo3 <- foo3[!grepl("File-Format|File-Restriction|Classification-JEL|Keywords:|Author-Name:", foo3)]
        foo3 <- c(foo2, foo3)
        foo4 <- data.frame(t(foo3))
        names_list <- c("URL", "Year", "Volume", "Issue", "Pages", "Journal", "Abstract", "Title")
@@ -434,16 +430,16 @@ rm(list = ls(pattern = "article"))
 save(aer_df, file = "ReDif/aer_repec.Rdata")
 
 
-############## JPE ################
-
-#This is the final frame in which all articles will be held. 
-df_articles = data.frame()
+#==== 4. JPE ====
+#Coverage: All volumes.
 
 jpefiles <- gsub(" ", "", c(apply(expand.grid("JPEv", 77:114, "n", 1:6), 1, paste, collapse=""),
             apply(expand.grid("JPEv", 116:124, "n", 1:6), 1, paste, collapse=""),
             apply(expand.grid("JPEv", 115, "n", 4:6), 1, paste, collapse=""),
             apply(expand.grid("JPEv", 125, "n", 1:4), 1, paste, collapse=""),
             "JPEv107nS6", "JPEv112nS1", "JPEunsorted"))
+
+df_articles = data.frame()
 
 for (yr in jpefiles) { #People of the future - you'll have to replace the latest file - most likely in expand.grid()
   urli <- paste0("ftp://ftp.repec.org/opt/ReDIF/RePEc/ucp/jpolec/", yr, ".repec.rdf")
@@ -568,10 +564,8 @@ rm(list = ls(pattern = "article"))
 save(jpe_df, file = "ReDif/jpe_repec.Rdata")
 
 
-############## ECTA ################
-
-#This is the final frame in which all articles will be held. 
-df_articles = data.frame()
+#==== 5. ECTA ====
+#Coverage: All volumes
 
 #WLY is the current one to be increased in the future.
 wly <- c(apply(expand.grid("ftp://ftp.repec.org/opt/ReDIF/RePEc/wly/emetrp/",
@@ -586,6 +580,8 @@ ecm <- c(apply(expand.grid("ftp://ftp.repec.org/opt/ReDIF/RePEc/ecm/emetrp/",
                           "ftp://ftp.repec.org/opt/ReDIF/RePEc/ecm/emetrp/emetrp_unique9319noauth.rdf")
 
 ectafiles <- c(wly, ecm)
+
+df_articles = data.frame()
 
 for (yr in ectafiles) { #People of the future - you'll have to replace the latest file - most likely in expand.grid()
   urli <- yr
@@ -664,8 +660,8 @@ for (yr in ectafiles) { #People of the future - you'll have to replace the lates
       foo2 <- gsub(" ," , "," ,  foo2)
       foo2 <- trimws(foo2, which = c("both"))
       foo2 <- unlist(strsplit(foo2, ", "))
-      foo3 <- article_list[[m]][- grep("Author-Name:", article_list[[m]])]
-      foo3 <- foo3[!grepl("File-Format|File-Restriction|Classification-JEL|Keywords:", foo3)]
+      foo3 <- article_list[[m]]
+      foo3 <- foo3[!grepl("File-Format|File-Restriction|Classification-JEL|Keywords:|Author-Name:", foo3)]
       foo3 <- c(foo2, foo3)
       foo4 <- data.frame(t(foo3))
       names_list <- c("URL", "Year", "Volume", "Issue", "Pages", "Journal", "Abstract", "Title")
@@ -716,14 +712,14 @@ rm(list = ls(pattern = "article"))
 save(ecta_df, file = "ReDif/ecta_repec.Rdata")
 
 
-############## TOP5 MERGE ################
+#==== 6. TOP5 MERGE ====
 
 top5_df <- rbind(aer_df, ecta_df, jpe_df, qje_df, restud_df)
 top5_df$Abstract[top5_df$Abstract=="Abstract:"] <- NA
 save(top5_df, file = "ReDif/top5_df.Rdata")
 
 
-############## Finding guilty papers ################
+#==== 7. Finding evidence from" papers ====
 
 setwd("/Work/Research/evidence from/ReDif")
 load('top5_df.Rdata')
@@ -735,7 +731,7 @@ top5_df$Evidence <- grepl("evidence from", top5_df$Title)
 frequency <- aggregate(top5_df$Evidence, by=list(Year=top5_df$Year, Journal=top5_df$Journal), FUN=sum)
 frequency <- subset(frequency, frequency$Year > 1969) 
 
-############## Graphing the evolution over time ################
+#-->> 7.1 Graphing "evidence from" over time ----
 
 #All Top 5 taken together
 frequency_all <- aggregate(frequency$x, by=list(Year=frequency$Year), FUN=sum)
@@ -764,7 +760,7 @@ print(histogram <- (ggplot(data=frequency, aes(x=frequency$Year, y=frequency$eve
 ggsave("frequency_byjn_hist.png")
 
 
-############## Author Names ################
+#==== 8. Author Names ====
 install.packages('humaniformat')
 library('humaniformat')
 
