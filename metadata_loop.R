@@ -1,8 +1,8 @@
-# Rvesting information on Top 5 (AER, QJE, JPE, Ecta [wiley and pre-wiley], REStud) using RePEc metadata. 
+# Rvesting information on Top 5 articles (AER, QJE, JPE, Ecta [wiley and pre-wiley], REStud) using RePEc metadata. 
 # Citation data from google scholar not included, can be appended with rPython - see Card and Della Vigna (2013)  
 
 
-necessarypkgs <- c("ggplot2", "rvest", "plyr", "curl", "psych")
+necessarypkgs <- c("ggplot2", "rvest", "plyr", "curl", "psych", "humaniformat")
 toinstall <- necessarypkgs[!(necessarypkgs %in% installed.packages()[,"Package"])]
 if(length(toinstall)!=0) install.packages(toinstall)
 
@@ -12,7 +12,8 @@ library('psych')
 library('plyr')
 library('ggplot2')
 
-setwd(dirname(file.choose()))
+setwd("/Work/Research/evidence from/ReDif")
+#setwd(dirname(file.choose()))
 
 remove(list = ls())
 
@@ -155,7 +156,7 @@ rm(j, k, l, ll, lt, m, o, n, q, qt, z, foo, foo1, fool, foo2, foo3, foo4, foo5, 
    qjefiles, url, url_cut, urli, nowant, delet_this)
 rm(list = ls(pattern = "article"))
 
-save(qje_df, file = "ReDif/qje_repec.Rdata")
+save(qje_df, file = "qje_repec.Rdata")
 
 #==== 2. REStud ====
 #Coverage: All volumes.
@@ -291,7 +292,7 @@ rm(j, k, l, ll, lt, m, o, n, q, qt, z, foo, foo1, fool, foo2, foo3, foo4, foo5, 
    restudfiles, url, url_cut, urli, nowant, delet_this)
 rm(list = ls(pattern = "article"))
 
-save(restud_df, file = "ReDif/restud_repec.Rdata")
+save(restud_df, file = "restud_repec.Rdata")
 
 #==== 3. AER ====
 #Coverage: 1969 onwards (AER start: 1911)
@@ -424,7 +425,7 @@ rm(j, k, l, ll, m, o, n, q, qt, z, foo, foo1, fool, foo2, foo3, url, url_cut, ur
    foo4, names_list, upto, end, yr, vol, delet_this, nowant)
 rm(list = ls(pattern = "article"))
 
-save(aer_df, file = "ReDif/aer_repec.Rdata")
+save(aer_df, file = "aer_repec.Rdata")
 
 
 #==== 4. JPE ====
@@ -557,7 +558,7 @@ rm(j, k, l, ll, m, o, n, q, qt, z, foo, foo1, fool, foo2, foo3, url, url_cut, ur
    foo4, names_list, upto, end, yr, vol, delet_this, nowant)
 rm(list = ls(pattern = "article"))
 
-save(jpe_df, file = "ReDif/jpe_repec.Rdata")
+save(jpe_df, file = "jpe_repec.Rdata")
 
 
 #==== 5. ECTA ====
@@ -704,19 +705,18 @@ rm(j, k, l, ll, lt, m, o, n, q, qt, z, foo, foo1, fool, foo2, foo3, url, url_cut
    wly, ecm, foo4, names_list, upto, end, yr, vol, delet_this, nowant)
 rm(list = ls(pattern = "article"))
 
-save(ecta_df, file = "ReDif/ecta_repec.Rdata")
+save(ecta_df, file = "ecta_repec.Rdata")
 
 
 #==== 6. TOP5 MERGE ====
 
 top5_df <- rbind(aer_df, ecta_df, jpe_df, qje_df, restud_df)
 top5_df$Abstract[top5_df$Abstract=="Abstract:"] <- NA
-save(top5_df, file = "ReDif/top5_df.Rdata")
+save(top5_df, file = "top5_df.Rdata")
 
 
 #==== 7. Finding evidence from" papers ====
 
-setwd("/Work/Research/evidence from/ReDif")
 load('top5_df.Rdata')
 
 library('ggplot2')
@@ -756,10 +756,13 @@ ggsave("frequency_byjn_hist.png")
 
 
 #==== 8. Author Names ====
-install.packages('humaniformat')
+load('top5_df.Rdata')
+
 library('humaniformat')
 
+top5_df$Title <- tolower(top5_df$Title)
+top5_df$Evidence <- grepl("evidence from", top5_df$Title)
 top5_evidence <- subset(top5_df, top5_df$Evidence==TRUE)
-top5_evidence$Authors[top5_evidence$Journal=="American Economic Review"] <- format_reverse(top5_evidence$Authors)
+
 authors_evidence <- unlist(top5_df$Authors[top5_df$Evidence==TRUE])
 head(authors_evidence)
