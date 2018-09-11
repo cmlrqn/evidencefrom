@@ -528,7 +528,8 @@ sum(df_articles$Year=="")
 jpe_df <- df_articles
 jpe_df <- unique(jpe_df)
 jpe_df <- subset(jpe_df, Title!='foreword' & Title!='editors\' introduction' & Title!='preface')
-delet_this <- "erratum|comment|minutes of the|report of the|corrigendum|Appendix|Comment|Comments|Reply|Corrigendum|Response|: A Correction|: Discussion."
+delet_this <- paste0("erratum|comment|minutes of the|report of the|corrigendum|",
+                     "Appendix|Comment|Comments|Reply|Corrigendum|Response|: A Correction|: Discussion.")
 jpe_df$gr <- grepl(delet_this, jpe_df$Title)
 jpe_df <- jpe_df[!grepl(delet_this, jpe_df$Title),]
 jpe_df$gr <- NULL
@@ -714,12 +715,15 @@ frequency_all <- aggregate(frequency$x, by=list(Year=frequency$Year), FUN=sum)
 frequency_all$events <- frequency_all$x
 
 print(histogram <- (ggplot(data=frequency_all, aes(x=frequency_all$Year, y=frequency_all$events, width=.7))
-                    + geom_col(col="red",aes(fill= frequency_all$events), size=0) + xlab('Year of Publication') + ylab('Appearances in Top 5 Journals'))
-      + scale_x_continuous(breaks=c(seq(1970,2010,by=5),2017)) + scale_y_continuous(breaks=c(seq(0,40,by=5)),
-                                                                    minor_breaks = seq(0,40, by=1)) + scale_fill_gradient("Count", low="green", high="red")
+                    + geom_col(col="red",aes(fill= frequency_all$events), size=0)
+                    + xlab('Year of Publication') + ylab('Appearances in Top 5 Journals'))
+      + scale_x_continuous(breaks=c(seq(1970,2010,by=5),2017))
+      + scale_y_continuous(breaks=c(seq(0,40,by=5)), minor_breaks = seq(0,40, by=1))
+      + scale_fill_gradient("Count", low="green", high="red")
       + guides(fill=guide_legend(title=NULL, reverse=T)) + ggtitle("Number of \"evidence from\" articles over the years")
       + theme(plot.title = element_text(lineheight=.8, face="bold", hjust = .5))
-      + theme(legend.position=c(0,1), legend.justification=c(0, 1), legend.direction="vertical", legend.background = element_rect(colour = NA, fill = NA))
+      + theme(legend.position=c(0,1), legend.justification=c(0, 1),
+        legend.direction="vertical", legend.background = element_rect(colour = NA, fill = NA))
 )
 ggsave("frequency_all_hist.png")
 
@@ -727,9 +731,12 @@ ggsave("frequency_all_hist.png")
 frequency$events <- frequency$x
 frequency$journal <- reorder(frequency$Journal, frequency$events)
 print(histogram <- (ggplot(data=frequency, aes(x=frequency$Year, y=frequency$events, width=.7))
-                    + geom_col(aes(fill= frequency$journal), size=0.25, color="black") + xlab('Year of Publication') + ylab('Appearances in Top 5 Journals'))
-      + scale_x_continuous(breaks=c(seq(1970,2010,by=5),2017)) + scale_y_continuous(breaks=c(seq(0,40,by=5)),
-         minor_breaks = seq(0,40, by=1))  + theme(legend.position=c(0,1), legend.justification=c(0, 1), legend.direction="vertical", legend.background = element_rect(colour = NA, fill = NA))
+                    + geom_col(aes(fill= frequency$journal), size=0.25, color="black")
+                    + xlab('Year of Publication') + ylab('Appearances in Top 5 Journals'))
+      + scale_x_continuous(breaks=c(seq(1970,2010,by=5),2017))
+      + scale_y_continuous(breaks=c(seq(0,40,by=5)), minor_breaks = seq(0,40, by=1))
+      + theme(legend.position=c(0,1), legend.justification=c(0, 1),
+        legend.direction="vertical", legend.background = element_rect(colour = NA, fill = NA))
       + guides(fill=guide_legend(title=NULL, reverse=T)) + ggtitle("Number of \" evidence from\" articles over the years")
       + theme(plot.title = element_text(lineheight=.8, face="bold", hjust = .5)) + scale_fill_brewer(palette = "RdBu")
 )
