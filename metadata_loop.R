@@ -1,5 +1,5 @@
-# Rvesting information on Top 5 articles (AER, QJE, JPE, Ecta [wiley and pre-wiley], REStud) using RePEc metadata. 
-# Citation data from google scholar not included, can be appended with rPython - see Card and Della Vigna (2013)  
+# Rvesting information on Top 5 articles (AER, QJE, JPE, Ecta [wiley and pre-wiley], REStud) using RePEc metadata.
+# Citation data from google scholar not included, can be appended with rPython - see Card and Della Vigna (2013)
 
 
 necessarypkgs <- c("ggplot2", "rvest", "plyr", "curl", "psych", "humaniformat")
@@ -18,58 +18,60 @@ setwd("/Work/Research/evidence from/ReDif")
 remove(list = ls())
 
 #EconPapers Journal IDs
-#AER = "aea/aecrev"        JPE = "ucp/jpolec"     QJE = "oup/qjecon"        
+#AER = "aea/aecrev"        JPE = "ucp/jpolec"     QJE = "oup/qjecon"
 #REStud = "oup/restud"     Ecta = "ecm/emetrp"    Ecta_w = "wly/emetrp"
+
+#==== Locals ====
 
 #==== 1. QJE ====
 #Coverage: All volumes.
 #For some reason 2011-2014 QJE articles have a format different from the other ~130 years.
 
-qjefiles <- c(paste0("qjecon_", 1886:2010), paste0("qjecon_", 2015:2017), 
-              "qje_2014", paste0(1261:1264, "-qjecon"), 
-              paste0(1271:1274, "-qjecon"), paste0(1281:1284, "-qjecon"))
+URL <- "ftp://ftp.repec.org/opt/ReDIF/RePEc/oup/qjecon/"
+pg <- html_text(read_html(URL)) %>% strsplit(., "-rw-r--r--")
+qjefiles <- pg[[1]] %>% gsub(".*    ", "",.) %>% gsub(".* ", "",.) %>% gsub("\n", "",.) %>% .[nchar(.)>0] %>%
+            paste0("ftp://ftp.repec.org/opt/ReDIF/RePEc/oup/qjecon/", .)
 
 df_articles = data.frame()
 
-for (yr in qjefiles) { #People of the future - you'll have to replace the latest year.
-  
-  urli <- paste0("ftp://ftp.repec.org/opt/ReDIF/RePEc/oup/qjecon/", yr, ".rdf")
-  url <- html_text(read_html(urli))
-  url <- iconv(url, "UTF-8", "UTF-8",sub='')
-  
+for (yr in qjefiles) {
+
+  urli <- yr
+  url  <- urli %>% read_html(.) %>% html_text(.) %>% iconv(., "UTF-8", "UTF-8",sub='')
+
   if(length(grep("\\n", url))==1){
-    url_cut <- unlist(strsplit(url[[1]], split = "\n"))
-    url_cut <- sub("\r", "", url_cut)
-    url_cut <- sub("\r", "", url_cut) #This double appears to be necessary in some files.
+    url_cut <- url %>% strsplit(.[[1]], split = "\n") %>% unlist(.) %>% sub("\r", "",.) %>% sub("\r", "",.) #double is necessary in some files.
   }
   if(length(grep("\\n", url))==0){
     url_cut <- unlist(strsplit(url[[1]], split = "\r"))
   }
-  
-  nowant <- "Classification-JEL|Keywords:|Month:|File-Format:|File-Restriction:|File-Function|data.zip|_app.pdf|_ds.zip|See http|Handle: RePEc|Note: DOI:|/aer/data/|aer/contents/|/aer/app/|articles/attachments|content/file"
+
+  nowant <- paste0("Classification-JEL|Keywords:|Month:|File-Format:|File-Restriction:|File-Function|data.zip",
+                   "|_app.pdf|_ds.zip|See http|Handle: RePEc|Note: DOI:|/aer/data/|aer/contents/|/aer/app/",
+                   "|articles/attachments|content/file")
   url_cut <- url_cut[!grepl(nowant, url_cut)]
   url_cut <- url_cut[url_cut != ""]
-  url_cut <- rle(url_cut)$values 
-  
-  #Create a data frame for each article eliminating unwanted details; then, generate an Author list() 
-  #column and append all articles.
+  url_cut <- rle(url_cut)$values
+
+  #Create a data frame for each article eliminating unwanted details; then, generate
+  #an Author list() column and append all articles.
   #We play with the "Template-Type: ReDIF-Article 1.0" lines.
-  
+
   article_list <- list()
   m <- 1
   o <- 1
-  
+
   for (n in 1:length(url_cut)) {
     if(url_cut[n] == "Template-Type: ReDIF-Article 1.0" & o!=n) {
       j <- o+1
       k <- n-1
-      
+
       foo <- assign(paste0("article", m), url_cut[ j:k])
       article_list[[m]]<- foo
       q <- which(grepl("Journal:", foo)==T) - 1
       l <- which(grepl("Abstract:", foo)==T)
-      
-      if(length(q)==0) { #If a paper has no journal info, add it 
+
+      if(length(q)==0) { #If a paper has no journal info, add it
         lt <- l-1
         foo <- c(foo[1:lt], "Journal: Quarterly Journal of Economics", foo[l:length(foo)])
         q <- which(grepl("Journal:", foo)==T) - 1
@@ -78,7 +80,7 @@ for (yr in qjefiles) { #People of the future - you'll have to replace the latest
         foo <- c(foo, "Abstract:")
         l <- q
       }
-      
+
       #Some files have Abstract before journal, others after; some don't even have journal - different behaviours
       qt <- q+1
       if(qt>l & q!=l){ #If the Journal comes after the abstract, we use it as a point of reference.
@@ -93,28 +95,24 @@ for (yr in qjefiles) { #People of the future - you'll have to replace the latest
           foo1 <- paste(article_list[[m]][l:q], collapse = "")
           foo[l] <- foo1
           ll <- l + 1
-          foo <- foo[- (ll:q) ] 
+          foo <- foo[- (ll:q) ]
         }
-      }   
+      }
       foo <- trimws(foo, which=c("both"))
       article_list[[m]]<- foo
       foo2 <- paste(article_list[[m]][grep("Author-Name:", article_list[[m]])], sep="")
       foo2[grep("Author-Name", foo2)] <- sub(",", "", foo2[grep("Author-Name", foo2)])
       foo2[1] <- paste(foo2, collapse = "")
-      foo2 <- foo2[1]
-      foo2 <- gsub("^Author-Name: " , "" , foo2)
-      foo2 <- gsub("Author-Name:" , "," ,  foo2)
-      foo2 <- gsub("  " , " " ,  foo2)
-      foo2 <- gsub(" ," , "," ,  foo2)
-      foo2 <- trimws(foo2, which = c("both"))
-      foo2 <- unlist(strsplit(foo2, ", "))
-      foo3 <- article_list[[m]][- grepl("Author-Name:", article_list[[m]])] 
+      foo2 <- foo2[1] %>% gsub("^Author-Name: ","",.) %>% gsub("Author-Name:",",",.) %>%
+                          gsub("  ", " ",.) %>% gsub(" ,",",",.) %>% trimws(.,which = c("both")) %>%
+                          unlist(strsplit(., ", "))
+      foo3 <- article_list[[m]][- grepl("Author-Name:", article_list[[m]])]
       foo3 <- c(foo2, foo3)
       foo4 <- data.frame(t(foo3))
       names_list <- c("URL", "Year", "Volume", "Issue", "Pages", "Journal", "Abstract", "Title")
       for (z in names_list) {
         foo5 <- which(grepl(paste0(z, ":"), foo3))
-        colnames(foo4)[foo5] <- z 
+        colnames(foo4)[foo5] <- z
       }
       foo4[,-1] <- sub(".*?: ", "", as.matrix(foo4[,-1]))
       colnames(foo4)[grep("^X", colnames(foo4))] <- "Author"
@@ -126,7 +124,7 @@ for (yr in qjefiles) { #People of the future - you'll have to replace the latest
       m <- m+1
       o <- n
     }
-  }  
+  }
 }
 
 
@@ -139,20 +137,21 @@ df_articles$Journal <- sub("The Quarterly Journal of Economics", "Quarterly Jour
 qje_df <- df_articles
 qje_df <- unique(qje_df)
 qje_df <- subset(qje_df, Title!='foreword' & Title!='editors\' introduction' & Title!='preface')
-delet_this <- "erratum|comment|minutes of the|report of the|corrigendum|Appendix|Comment|Comments|Reply|Corrigendum|Response|: A Correction|: Discussion."
+delet_this <- paste0("erratum|comment|minutes of the|report of the|corrigendum|Appendix|Comment|",
+                     "Comments|Reply|Corrigendum|Response|: A Correction|: Discussion.")
 qje_df$gr <- grepl(delet_this, qje_df$Title)
 qje_df <- qje_df[!grepl(delet_this, qje_df$Title),]
 qje_df$gr <- NULL
 qje_df$Issue[grep("_Part", qje_df$Issue)] <- substr(qje_df$Issue[grep("_Part", qje_df$Issue)], 0, 1)
 qje_df$Year <- as.numeric(qje_df$Year)
 sum(is.na(qje_df$Year))
-qje_df$Year[is.na(qje_df$Year) & qje_df$Volume >= 132] <- 2017 #Articles from recent volume are missing year 
+qje_df$Year[is.na(qje_df$Year) & qje_df$Volume >= 132] <- 2017 #Articles from recent volume are missing year
 qje_df$Volume <- as.numeric(qje_df$Volume)
-#qje_df$Issue <- as.numeric(qje_df$Issue) There is a Supplement issue in 1985, let us keep it named as Supplement. 
-qje_df <- qje_df[with(qje_df, order(Year, Volume, Issue)),] 
+#qje_df$Issue <- as.numeric(qje_df$Issue) There is a Supplement issue in 1985, let us keep it named as Supplement.
+qje_df <- qje_df[with(qje_df, order(Year, Volume, Issue)),]
 
 #Cleaning up
-rm(j, k, l, ll, lt, m, o, n, q, qt, z, foo, foo1, fool, foo2, foo3, foo4, foo5, names_list, upto, end, yr, vol, 
+rm(j, k, l, ll, lt, m, o, n, q, qt, z, foo, foo1, fool, foo2, foo3, foo4, foo5, names_list, upto, end, yr, vol,
    qjefiles, url, url_cut, urli, nowant, delet_this)
 rm(list = ls(pattern = "article"))
 
@@ -161,51 +160,50 @@ save(qje_df, file = "qje_repec.Rdata")
 #==== 2. REStud ====
 #Coverage: All volumes.
 
-#People of the future - you'll have to replace the latest year.
-restudfiles <- c(paste0("restud_", 1933:2001),paste0("restud_", 2015:2017), "restud_2014_2", "restud_81_3_4")
-restudfiles <- c(paste0("ftp://ftp.repec.org/opt/ReDIF/RePEc/oup/restud/", restudfiles, ".rdf"), 
-                 "ftp://ftp.repec.org/opt/ReDIF/RePEc/oup/restud/restud_uniqueE329.rdf")
+
+ URL <- "ftp://ftp.repec.org/opt/ReDIF/RePEc/oup/restud/"
+ pg <- html_text(read_html(URL)) %>% strsplit(., "-rw-r--r--")
+ restudfiles <- pg[[1]] %>% gsub(".*    ", "",.) %>% gsub(".* ", "",.) %>% gsub("\n", "",.) %>% .[nchar(.)>0]
 
 df_articles = data.frame()
 
-for (yr in restudfiles) { 
-  
-  url <- html_text(read_html(yr))
+for (yr in restudfiles) {
+
+  url <- yr %>% read_html(.) %>% html_text(.)
   url <- iconv(url, "UTF-8", "UTF-8",sub='')
-  
+
   if(length(grep("\\n", url))==1){
-    url_cut <- unlist(strsplit(url[[1]], split = "\n"))
-    url_cut <- sub("\r", "", url_cut)
-    url_cut <- sub("\r", "", url_cut) #This double appears to be necessary in some files.
+    url_cut <- url %>% strsplit(.[[1]], split = "\n") %>% unlist(.) %>% sub("\r", "",.) %>% sub("\r", "",.) # double is necessary in some files.
   }
   if(length(grep("\\n", url))==0){
     url_cut <- unlist(strsplit(url[[1]], split = "\r"))
   }
-  
-  nowant <- "Classification-JEL|Keywords:|Month:|File-Format:|File-Restriction:|File-Function|data.zip|_app.pdf|_ds.zip|See http|Handle: RePEc|Note: DOI:|/aer/data/|aer/contents/|/aer/app/|articles/attachments|content/file"
+
+  nowant <- paste0("Classification-JEL|Keywords:|Month:|File-Format:|File-Restriction:|File-Function|data.zip",
+            "|_app.pdf|_ds.zip|See http|Handle: RePEc|Note: DOI:|/aer/data/|aer/contents/|/aer/app/|articles/attachments|content/file")
   url_cut <- url_cut[!grepl(nowant, url_cut)]
   url_cut <- url_cut[url_cut != ""]
-  url_cut <- rle(url_cut)$values 
-  
-  #Create a data frame for each article eliminating unwanted details; then, generate an Author list() 
+  url_cut <- rle(url_cut)$values
+
+  #Create a data frame for each article eliminating unwanted details; then, generate an Author list()
   #column and append all articles.
   #We play with the "Template-Type: ReDIF-Article 1.0" lines.
-  
+
   article_list <- list()
   m <- 1
   o <- 1
-  
+
   for (n in 1:length(url_cut)) {
     if(url_cut[n] == "Template-Type: ReDIF-Article 1.0" & o!=n) {
       j <- o+1
       k <- n-1
-      
+
       foo <- assign(paste0("article", m), url_cut[ j:k])
       article_list[[m]]<- foo
       q <- which(grepl("Journal:", foo)==T) - 1
       l <- which(grepl("Abstract:", foo)==T)
-      
-      if(length(q)==0) { #If a paper has no journal info, add it 
+
+      if(length(q)==0) { #If a paper has no journal info, add it
         lt <- l-1
         foo <- c(foo[1:lt], "Journal: Quarterly Journal of Economics", foo[l:length(foo)])
         q <- which(grepl("Journal:", foo)==T) - 1
@@ -214,7 +212,7 @@ for (yr in restudfiles) {
         foo <- c(foo, "Abstract:")
         l <- q
       }
-      
+
       #Some files have Abstract before journal, others after; some don't even have journal - different behaviours
       qt <- q+1
       if(qt>l & q!=l){ #If the Journal comes after the abstract, we use it as a point of reference.
@@ -229,28 +227,23 @@ for (yr in restudfiles) {
           foo1 <- paste(article_list[[m]][l:q], collapse = "")
           foo[l] <- foo1
           ll <- l + 1
-          foo <- foo[- (ll:q) ] 
+          foo <- foo[- (ll:q) ]
         }
-      }   
+      }
       foo <- trimws(foo, which=c("both"))
       article_list[[m]]<- foo
       foo2 <- paste(article_list[[m]][grep("Author-Name:", article_list[[m]])], sep="")
       foo2[grep("Author-Name", foo2)] <- sub(",", "", foo2[grep("Author-Name", foo2)])
       foo2[1] <- paste(foo2, collapse = "")
-      foo2 <- foo2[1]
-      foo2 <- gsub("^Author-Name: " , "" , foo2)
-      foo2 <- gsub("Author-Name:" , "," ,  foo2)
-      foo2 <- gsub("  " , " " ,  foo2)
-      foo2 <- gsub(" ," , "," ,  foo2)
-      foo2 <- trimws(foo2, which = c("both"))
-      foo2 <- unlist(strsplit(foo2, ", "))
-      foo3 <- article_list[[m]][- grepl("Author-Name:", article_list[[m]])] 
+      foo2 <- foo2 %>% .[1] %>% gsub("^Author-Name: " , "" ,.) %>% gsub("Author-Name:" , "," ,.) %>%
+              gsub("  " , " " ,.) %>% gsub(" ," , "," ,.) %>% trimws(., which = c("both")) %>% unlist(strsplit(., ", "))
+      foo3 <- article_list[[m]][- grepl("Author-Name:", article_list[[m]])]
       foo3 <- c(foo2, foo3)
       foo4 <- data.frame(t(foo3))
       names_list <- c("URL", "Year", "Volume", "Issue", "Pages", "Journal", "Abstract", "Title")
       for (z in names_list) {
         foo5 <- which(grepl(paste0(z, ":"), foo3))
-        colnames(foo4)[foo5] <- z 
+        colnames(foo4)[foo5] <- z
       }
       foo4[,-1] <- sub(".*?: ", "", as.matrix(foo4[,-1]))
       colnames(foo4)[grep("^X", colnames(foo4))] <- "Author"
@@ -262,7 +255,7 @@ for (yr in restudfiles) {
       m <- m+1
       o <- n
     }
-  }  
+  }
 }
 
 
@@ -282,13 +275,13 @@ restud_df$gr <- NULL
 restud_df$Issue[grep("_Part", restud_df$Issue)] <- substr(restud_df$Issue[grep("_Part", restud_df$Issue)], 0, 1)
 restud_df$Year <- as.numeric(restud_df$Year)
 sum(is.na(restud_df$Year))
-restud_df$Year[is.na(restud_df$Year) & restud_df$Volume >= 84] <- 2017 #Articles from recent volume are missing year 
+restud_df$Year[is.na(restud_df$Year) & restud_df$Volume >= 84] <- 2017 #Articles from recent volume are missing year
 
 restud_df$Volume <- as.numeric(restud_df$Volume)
-restud_df <- restud_df[with(restud_df, order(Year, Volume, Issue)),] 
+restud_df <- restud_df[with(restud_df, order(Year, Volume, Issue)),]
 
 #Cleaning up
-rm(j, k, l, ll, lt, m, o, n, q, qt, z, foo, foo1, fool, foo2, foo3, foo4, foo5, names_list, upto, end, yr, vol, 
+rm(j, k, l, ll, lt, m, o, n, q, qt, z, foo, foo1, fool, foo2, foo3, foo4, foo5, names_list, upto, end, yr, vol,
    restudfiles, url, url_cut, urli, nowant, delet_this)
 rm(list = ls(pattern = "article"))
 
@@ -297,42 +290,39 @@ save(restud_df, file = "restud_repec.Rdata")
 #==== 3. AER ====
 #Coverage: 1969 onwards (AER start: 1911)
 
-
-aerfiles <- gsub(" ", "", c(
-    apply(expand.grid("AER_", 89:100, "0", 1:5), 1, paste, collapse=""), apply(expand.grid("AER_", 101:103, "0", 1:7), 1, paste, collapse=""),
-    apply(expand.grid("AER_", 104:106, "0", 1:9), 1, paste, collapse=""), apply(expand.grid("AER_", 104:106, 10:12), 1, paste, collapse=""),
-    apply(expand.grid("AER_", 107,"0", 1:9), 1, paste, collapse=""), c(paste0("p", 1:8, "aer"), paste0("q", 1:9, "aer"), 
-    paste0("r", 1:9, "aer"), paste0("s", 1:4, "aer"))
-    ))
+URL <- "ftp://ftp.repec.org/opt/ReDIF/RePEc/aea/aecrev/"
+pg <- html_text(read_html(URL)) %>% strsplit(., "-rw-r--r--")
+aerfiles <- pg[[1]] %>% gsub(".*    ", "",.) %>% gsub(".* ", "",.) %>% gsub("\n", "",.) %>% .[nchar(.)>0] %>%
+            paste0("ftp://ftp.repec.org/opt/ReDIF/RePEc/aea/aecrev/", .)
 
 df_articles = data.frame()
 
-for (yr in aerfiles) { #People of the future - you'll have to replace the latest file.
-  urli <- paste0("ftp://ftp.repec.org/opt/ReDIF/RePEc/aea/aecrev/", yr, ".rdf")
-  url <- html_text(read_html(urli))
+for (yr in aerfiles) {
+  urli <- yr
+  url <- urli %>% read_html(.) %>% html_text(.)
   if(length(grep("\\n", url))==1){
-  url <- iconv(url, "UTF-8", "UTF-8",sub='')
-  url_cut <- unlist(strsplit(url[[1]], split = "\n"))
-  url_cut <- sub("\r", "", url_cut)
-  url_cut <- sub("\r", "", url_cut) #This double is necessary in some files.
+  url_cut <- url %>% iconv(., "UTF-8", "UTF-8",sub='') %>% strsplit(.[[1]], split = "\n") %>% unlist(.) %>%
+                     sub("\r", "", .) %>% sub("\r", "",.) #This double is necessary in some files.
   }
   if(length(grep("\\n", url))==0){
     url_cut <- unlist(strsplit(url[[1]], split = "\r"))
   }
-  url_cut <- url_cut[url_cut != ""]
-  nowant <- "Classification-JEL|Keywords:|Month:|File-Format:|File-Restriction:|File-Function|data.zip|_app.pdf|_ds.zip|See http|Handle: RePEc|Note: DOI:|/aer/data/|aer/contents/|/aer/app/|articles/attachments|content/file"
+  nowant <- paste0("Classification-JEL|Keywords:|Month:|File-Format:|File-Restriction:|",
+                   "File-Function|data.zip|_app.pdf|_ds.zip|See http|Handle: RePEc|Note:",
+                   " DOI:|/aer/data/|aer/contents/|/aer/app/|articles/attachments|content/file")
   url_cut <- url_cut[!grepl(nowant, url_cut)]
+  url_cut <- url_cut[url_cut != ""]
   url_cut <- trimws(url_cut, which=c("both"))
-  url_cut <- rle(url_cut)$values 
-  
-  #Create a data frame for each article eliminating unwanted details; then, generate an Author list() 
+  url_cut <- rle(url_cut)$values
+
+  #Create a data frame for each article eliminating unwanted details; then, generate an Author list()
   #column and append all articles.
   #We play with the "Template-Type: ReDIF-Article 1.0" lines.
-     
+
      article_list <- list()
      m <- 1
      o <- 1
-     
+
    for (n in 1:length(url_cut)) {
      if(url_cut[n] == "Template-Type: ReDIF-Article 1.0" & o!=n) {
        j <- o+1
@@ -349,7 +339,7 @@ for (yr in aerfiles) { #People of the future - you'll have to replace the latest
        l <- q
        qt <- q+1
        }
-       if(qt>=l){ 
+       if(qt>=l){
           if(q!=l){
            foo1 <- paste(article_list[[m]][l:q], collapse = "")
            foo[(grepl("Abstract:", foo)==T)] <- foo1
@@ -358,33 +348,29 @@ for (yr in aerfiles) { #People of the future - you'll have to replace the latest
           }
        }
        else {
-         if(qt<l){ 
+         if(qt<l){
              q <- length(foo) - 1
              foo1 <- paste(article_list[[m]][l:q], collapse = "")
              foo[(grepl("Abstract:", foo)==T)] <- foo1
              ll <- l + 1
-             foo <- foo[- (ll:q) ] 
+             foo <- foo[- (ll:q) ]
           }
-       }   
+       }
        article_list[[m]]<- foo
        foo2 <- paste(article_list[[m]][grep("Author-Name:", article_list[[m]])], sep="")
        foo2[grep("Author-Name", foo2)] <- sub(",", "", foo2[grep("Author-Name", foo2)])
        foo2[1] <- paste(foo2, collapse = "")
-       foo2 <- foo2[1]
-       foo2 <- gsub("^Author-Name: " , "" , foo2)
-       foo2 <- gsub("Author-Name:" , "," ,  foo2)
-       foo2 <- gsub("  " , " " ,  foo2)
-       foo2 <- gsub(" ," , "," ,  foo2)
-       foo2 <- trimws(foo2, which = c("both"))
-       foo2 <- unlist(strsplit(foo2, ", "))
-       foo3 <- article_list[[m]][- grepl("Author-Name:", article_list[[m]])] 
+       foo2 <- foo2 %>% .[1] %>% gsub("^Author-Name: " , "" ,.) %>% gsub("Author-Name:" , "," ,.) %>%
+                    gsub("  " , " " ,.) %>% gsub(" ," , "," ,.) %>% trimws(., which = c("both")) %>%
+                    unlist(strsplit(., ", "))
+       foo3 <- article_list[[m]][- grepl("Author-Name:", article_list[[m]])]
        foo3 <- c(foo2, foo3)
        foo4 <- data.frame(t(foo3))
        names_list <- c("URL", "Year", "Volume", "Issue", "Pages", "Journal", "Abstract", "Title")
        for (z in names_list) {
          name1 <- paste0(z, ":")
          foo5 <- which(grepl(name1, foo3))
-         colnames(foo4)[foo5] <- z 
+         colnames(foo4)[foo5] <- z
        }
        foo4[,-1] <- sub(".*?: ", "", as.matrix(foo4[,-1]))
        colnames(foo4)[grep("^X", colnames(foo4))] <- "Author"
@@ -396,12 +382,12 @@ for (yr in aerfiles) { #People of the future - you'll have to replace the latest
        m <- m+1
        o <- n
      }
-   }  
+   }
  }
 
 df_articles$Abstract<- gsub("Abstract:", "", df_articles$Abstract)
 
-#Some recent articles are missing year 
+#Some recent articles are missing year
 #df_articles$Year[df_articles$Year=="" & df_articles$Volume ==84] <- 2017
 sum(df_articles$Year=="")
 
@@ -411,17 +397,18 @@ sum(df_articles$Year=="")
 aer_df <- df_articles
 aer_df <- unique(aer_df)
 aer_df <- subset(aer_df, Title!='foreword' & Title!='editors\' introduction' & Title!='preface')
-delet_this <- "erratum|comment|minutes of the|report of the|corrigendum|Appendix|Comment|Comments|Reply|Corrigendum|Response|: A Correction|: Discussion."
+delet_this <- paste0("erratum|comment|minutes of the|report of the|corrigendum|Appendix|",
+                     "Comment|Comments|Reply|Corrigendum|Response|: A Correction|: Discussion.")
 aer_df$gr <- grepl(delet_this, aer_df$Title)
 aer_df <- aer_df[!grepl(delet_this, aer_df$Title),]
 aer_df$gr <- NULL
 aer_df$Year <- as.numeric(aer_df$Year)
 aer_df$Volume <- as.numeric(aer_df$Volume)
-aer_df$Issue <- as.numeric(aer_df$Issue) 
-aer_df <- aer_df[with(aer_df, order(Year, Volume, Issue, Pages)),] 
+aer_df$Issue <- as.numeric(aer_df$Issue)
+aer_df <- aer_df[with(aer_df, order(Year, Volume, Issue, Pages)),]
 
 #Cleaning up
-rm(j, k, l, ll, m, o, n, q, qt, z, foo, foo1, fool, foo2, foo3, url, url_cut, urli, aerfiles, foo5, name1, 
+rm(j, k, l, ll, m, o, n, q, qt, z, foo, foo1, fool, foo2, foo3, url, url_cut, urli, aerfiles, foo5, name1,
    foo4, names_list, upto, end, yr, vol, delet_this, nowant)
 rm(list = ls(pattern = "article"))
 
@@ -431,18 +418,17 @@ save(aer_df, file = "aer_repec.Rdata")
 #==== 4. JPE ====
 #Coverage: All volumes.
 
-jpefiles <- gsub(" ", "", c(apply(expand.grid("JPEv", 77:114, "n", 1:6), 1, paste, collapse=""),
-            apply(expand.grid("JPEv", 116:124, "n", 1:6), 1, paste, collapse=""),
-            apply(expand.grid("JPEv", 115, "n", 4:6), 1, paste, collapse=""),
-            apply(expand.grid("JPEv", 125, "n", 1:4), 1, paste, collapse=""),
-            "JPEv107nS6", "JPEv112nS1", "JPEunsorted"))
+URL <- "ftp://ftp.repec.org/opt/ReDIF/RePEc/ucp/jpolec/"
+pg <- html_text(read_html(URL)) %>% strsplit(., "-rw-r--r--")
+jpefiles <- pg[[1]] %>% gsub(".*    ", "",.) %>% gsub(".* ", "",.) %>% gsub("\n", "",.) %>% .[nchar(.)>0] %>%
+            paste0("ftp://ftp.repec.org/opt/ReDIF/RePEc/ucp/jpolec/", .)
+
 
 df_articles = data.frame()
 
-for (yr in jpefiles) { #People of the future - you'll have to replace the latest file - most likely in expand.grid()
-  urli <- paste0("ftp://ftp.repec.org/opt/ReDIF/RePEc/ucp/jpolec/", yr, ".repec.rdf")
-  
-  url <- html_text(read_html(urli))
+for (yr in jpefiles) {
+  urli <- yr
+  url  <- urli %>% read_html(.) %>% html_text(.)
   if(length(grep("\\n", url))==1){
     url <- iconv(url, "UTF-8", "UTF-8",sub='')
     url_cut <- unlist(strsplit(url[[1]], split = "\n"))
@@ -452,25 +438,27 @@ for (yr in jpefiles) { #People of the future - you'll have to replace the latest
   if(length(grep("\\n", url))==0){
     url_cut <- unlist(strsplit(url[[1]], split = "\r"))
   }
-  url_cut <- url_cut[url_cut != ""]
-  nowant <- "Classification-JEL|Keywords:|Month:|File-Format:|File-Restriction:|File-Function|data.zip|_app.pdf|_ds.zip|See http|Handle: RePEc|Note: DOI:|/aer/data/|aer/contents/|/aer/app/|articles/attachments|content/file"
+  nowant <- paste0("Classification-JEL|Keywords:|Month:|File-Format:|File-Restriction:|",
+                   "File-Function|data.zip|_app.pdf|_ds.zip|See http|Handle: RePEc|Note:",
+                   " DOI:|/aer/data/|aer/contents/|/aer/app/|articles/attachments|content/file")
   url_cut <- url_cut[!grepl(nowant, url_cut)]
+  url_cut <- url_cut[url_cut != ""]
   url_cut <- trimws(url_cut, which=c("both"))
-  url_cut <- rle(url_cut)$values 
-  
-  #Create a data frame for each article eliminating unwanted details; then, generate an Author list() 
+  url_cut <- rle(url_cut)$values
+
+  #Create a data frame for each article eliminating unwanted details; then, generate an Author list()
   #column and append all articles.
   #We play with the "Template-Type: ReDIF-Article 1.0" lines.
-  
+
   article_list <- list()
   m <- 1
   o <- 1
-  
+
   for (n in 1:length(url_cut)) {
     if(url_cut[n] == "Template-Type: ReDIF-Article 1.0" & o!=n) {
       j <- o+1
       k <- n-1
-      
+
       foo <- assign(paste0("article", m), url_cut[ j:k])
       article_list[[m]]<- foo
       q <- which(grepl("Journal:", foo)==T) - 1
@@ -482,7 +470,7 @@ for (yr in jpefiles) { #People of the future - you'll have to replace the latest
         l <- q
         qt <- q+1
       }
-      if(qt>=l){ 
+      if(qt>=l){
         if(q!=l){
           foo1 <- paste(article_list[[m]][l:q], collapse = "")
           foo[(grepl("Abstract:", foo)==T)] <- foo1
@@ -491,33 +479,29 @@ for (yr in jpefiles) { #People of the future - you'll have to replace the latest
         }
       }
       else {
-        if(qt<l){ 
+        if(qt<l){
           q <- length(foo) - 1
           foo1 <- paste(article_list[[m]][l:q], collapse = "")
           foo[(grepl("Abstract:", foo)==T)] <- foo1
           ll <- l + 1
-          foo <- foo[- (ll:q) ] 
+          foo <- foo[- (ll:q) ]
         }
-      }   
+      }
       article_list[[m]]<- foo
       foo2 <- paste(article_list[[m]][grep("Author-Name:", article_list[[m]])], sep="")
       foo2[grep("Author-Name", foo2)] <- sub(",", "", foo2[grep("Author-Name", foo2)])
       foo2[1] <- paste(foo2, collapse = "")
-      foo2 <- foo2[1]
-      foo2 <- gsub("^Author-Name: " , "" , foo2)
-      foo2 <- gsub("Author-Name:" , "," ,  foo2)
-      foo2 <- gsub("  " , " " ,  foo2)
-      foo2 <- gsub(" ," , "," ,  foo2)
-      foo2 <- trimws(foo2, which = c("both"))
-      foo2 <- unlist(strsplit(foo2, ", "))
-      foo3 <- article_list[[m]][- grepl("Author-Name:", article_list[[m]])] 
+      foo2 <- foo2[1] %>% gsub("^Author-Name: " , "" ,.) %>% gsub("Author-Name:" , "," ,.) %>%
+              gsub("  " , " " ,.) %>% gsub(" ," , "," ,.) %>% trimws(., which = c("both")) %>%
+              unlist(strsplit(., ", "))
+      foo3 <- article_list[[m]][- grepl("Author-Name:", article_list[[m]])]
       foo3 <- c(foo2, foo3)
       foo4 <- data.frame(t(foo3))
       names_list <- c("URL", "Year", "Volume", "Issue", "Pages", "Journal", "Abstract", "Title")
       for (z in names_list) {
         name1 <- paste0(z, ":")
         foo5 <- which(grepl(name1, foo3))
-        colnames(foo4)[foo5] <- z 
+        colnames(foo4)[foo5] <- z
       }
       foo4[,-1] <- sub(".*?: ", "", as.matrix(foo4[,-1]))
       colnames(foo4)[grep("^X", colnames(foo4))] <- "Author"
@@ -529,12 +513,12 @@ for (yr in jpefiles) { #People of the future - you'll have to replace the latest
       m <- m+1
       o <- n
     }
-  }  
+  }
 }
 
 df_articles$Abstract<- gsub("Abstract:", "", df_articles$Abstract)
 
-#Some recent articles are missing year 
+#Some recent articles are missing year
 #df_articles$Year[df_articles$Year=="" & df_articles$Volume ==84] <- 2017
 sum(df_articles$Year=="")
 
@@ -550,11 +534,11 @@ jpe_df <- jpe_df[!grepl(delet_this, jpe_df$Title),]
 jpe_df$gr <- NULL
 jpe_df$Year <- as.numeric(jpe_df$Year)
 jpe_df$Volume <- as.numeric(jpe_df$Volume)
-jpe_df$Issue <- as.numeric(jpe_df$Issue) 
-jpe_df <- jpe_df[with(jpe_df, order(Year, Volume, Issue, Pages)),] 
+jpe_df$Issue <- as.numeric(jpe_df$Issue)
+jpe_df <- jpe_df[with(jpe_df, order(Year, Volume, Issue, Pages)),]
 
 #Cleaning up
-rm(j, k, l, ll, m, o, n, q, qt, z, foo, foo1, fool, foo2, foo3, url, url_cut, urli, jpefiles, foo5, name1, 
+rm(j, k, l, ll, m, o, n, q, qt, z, foo, foo1, fool, foo2, foo3, url, url_cut, urli, jpefiles, foo5, name1,
    foo4, names_list, upto, end, yr, vol, delet_this, nowant)
 rm(list = ls(pattern = "article"))
 
@@ -565,53 +549,55 @@ save(jpe_df, file = "jpe_repec.Rdata")
 #Coverage: All volumes
 
 #WLY is the current one to be increased in the future.
-wly <- c(apply(expand.grid("ftp://ftp.repec.org/opt/ReDIF/RePEc/wly/emetrp/",
-                           "ECTA", 82:83, ".", 1:6, ".rdf"), 1, paste, collapse=""),
-         apply(expand.grid("ftp://ftp.repec.org/opt/ReDIF/RePEc/wly/emetrp/",
-                           "ECTA", 84, ".", 1:5, ".rdf"), 1, paste, collapse=""))
-#ECM is the pre-Wiley Econometrica. 
-ecm <- c(apply(expand.grid("ftp://ftp.repec.org/opt/ReDIF/RePEc/ecm/emetrp/",
-                           "ECTA", 79:81, ".", 1:6, ".rdf"), 1, paste, collapse=""),
-                           "ftp://ftp.repec.org/opt/ReDIF/RePEc/ecm/emetrp/ECTA78.6.rdf", 
-                          paste0("ftp://ftp.repec.org/opt/ReDIF/RePEc/ecm/emetrp/ecta_", c(773:776,781:785), ".rdf"),
-                          "ftp://ftp.repec.org/opt/ReDIF/RePEc/ecm/emetrp/emetrp_unique9319noauth.rdf")
+URL <- "ftp://ftp.repec.org/opt/ReDIF/RePEc/wly/emetrp/"
+pg <- html_text(read_html(URL)) %>% strsplit(., "-rw-r--r--")
+wly <- pg[[1]] %>% gsub(".*    ", "",.) %>% gsub(".* ", "",.) %>% gsub("\n", "",.) %>% .[nchar(.)>0] %>%
+       .[!grepl(".html",.)] %>% paste0("ftp://ftp.repec.org/opt/ReDIF/RePEc/wly/emetrp/", .)
+
+#ECM is the pre-Wiley Econometrica.
+URL <- "ftp://ftp.repec.org/opt/ReDIF/RePEc/ecm/emetrp/"
+pg <- html_text(read_html(URL)) %>% strsplit(., "-rw-r--r--")
+ecm <- pg[[1]] %>% gsub(".*    ", "",.) %>% gsub(".* ", "",.) %>% gsub("\n", "",.) %>% .[nchar(.)>0] %>%
+       paste0("ftp://ftp.repec.org/opt/ReDIF/RePEc/ecm/emetrp/", .)
 
 ectafiles <- c(wly, ecm)
 
 df_articles = data.frame()
 
-for (yr in ectafiles) { #People of the future - you'll have to replace the latest file - most likely in expand.grid()
+for (yr in ectafiles) {
+
   urli <- yr
-  
-  url <- html_text(read_html(urli))
+  url <- urli %>% read_html(.) %>% html_text(.)
   if(length(grep("\\n", url))==1){
-    url <- iconv(url, "UTF-8", "UTF-8",sub='')
-    url_cut <- unlist(strsplit(url[[1]], split = "\n"))
-    url_cut <- sub("\r", "", url_cut)
-    url_cut <- sub("\r", "", url_cut) #This double is necessary in some files.
+    url_cut <- url %>% iconv(., "UTF-8", "UTF-8",sub='') %>% strsplit(.[[1]], split = "\n") %>% unlist(.) %>%
+               sub("\r", "",.) %>% sub("\r", "",.) #This double is necessary in some files.
   }
   if(length(grep("\\n", url))==0){
     url_cut <- unlist(strsplit(url[[1]], split = "\r"))
   }
   url_cut <- url_cut[url_cut != ""]
-  nowant <- "Classification-JEL|Keywords:|Month:|File-Format:|File-Restriction:|File-Function|data.zip|_app.pdf|_ds.zip|See http|Handle: RePEc|Note: DOI:|/aer/data/|aer/contents/|/aer/app/|articles/attachments|content/file|Author-Email|Author-Workplace"
+  nowant <- paste0("Classification-JEL|Keywords:|Month:|File-Format:|File-Restriction:|",
+                   "File-Function|data.zip|_app.pdf|_ds.zip|See http|Handle: RePEc|Note:",
+                   " DOI:|/aer/data/|aer/contents/|/aer/app/|articles/attachments|content",
+                   "/file|Author-Email|Author-Workplace")
   url_cut <- url_cut[!grepl(nowant, url_cut)]
+  url_cut <- url_cut[url_cut != ""]
   url_cut <- trimws(url_cut, which=c("both"))
-  url_cut <- rle(url_cut)$values 
-  
-  #Create a data frame for each article eliminating unwanted details; then, generate an Author list() 
+  url_cut <- rle(url_cut)$values
+
+  #Create a data frame for each article eliminating unwanted details; then, generate an Author list()
   #column and append all articles.
   #We play with the "Template-Type: ReDIF-Article 1.0" lines.
-  
+
   article_list <- list()
   m <- 1
   o <- 1
-  
+
   for (n in 1:length(url_cut)) {
     if(url_cut[n] == "Template-Type: ReDIF-Article 1.0" & o!=n) {
       j <- o+1
       k <- n-1
-      
+
       foo <- assign(paste0("article", m), url_cut[ j:k])
       article_list[[m]]<- foo
       q <- which(grepl("Journal:", foo)==T) - 1
@@ -622,14 +608,14 @@ for (yr in ectafiles) { #People of the future - you'll have to replace the lates
       q <- which(grepl("Journal:", foo)==T) - 1
       qt <- which(grepl("Journal:", foo)==T)
       }
-      
+
       #Some files have Abstract before journal, others after - different behaviours
       if(length(l)==0) {
         foo <- c(foo, "Abstract:")
         l <- q
         qt <- q+1
       }
-      if(qt>=l){ 
+      if(qt>=l){
         if(q!=l){
           foo1 <- paste(article_list[[m]][l:q], collapse = "")
           foo[(grepl("Abstract:", foo)==T)] <- foo1
@@ -638,33 +624,29 @@ for (yr in ectafiles) { #People of the future - you'll have to replace the lates
         }
       }
       else {
-        if(qt<l){ 
+        if(qt<l){
           q <- length(foo) - 1
           foo1 <- paste(article_list[[m]][l:q], collapse = "")
           foo[(grepl("Abstract:", foo)==T)] <- foo1
           ll <- l + 1
-          foo <- foo[- (ll:q) ] 
+          foo <- foo[- (ll:q) ]
         }
-      }   
+      }
       article_list[[m]]<- foo
       foo2 <- paste(article_list[[m]][grep("Author-Name:", article_list[[m]])], sep="")
       foo2[grep("Author-Name", foo2)] <- sub(",", "", foo2[grep("Author-Name", foo2)])
       foo2[1] <- paste(foo2, collapse = "")
-      foo2 <- foo2[1]
-      foo2 <- gsub("^Author-Name: " , "" , foo2)
-      foo2 <- gsub("Author-Name:" , "," ,  foo2)
-      foo2 <- gsub("  " , " " ,  foo2)
-      foo2 <- gsub(" ," , "," ,  foo2)
-      foo2 <- trimws(foo2, which = c("both"))
-      foo2 <- unlist(strsplit(foo2, ", "))
-      foo3 <- article_list[[m]][- grepl("Author-Name:", article_list[[m]])] 
+      foo2 <- foo2 %>% .[1] %>% gsub("^Author-Name: " , "" ,.) %>% gsub("Author-Name:" , "," ,.) %>%
+              gsub("  " , " " ,.) %>% gsub(" ," , "," ,.) %>% trimws(., which = c("both")) %>%
+              unlist(strsplit(., ", "))
+      foo3 <- article_list[[m]][- grepl("Author-Name:", article_list[[m]])]
       foo3 <- c(foo2, foo3)
       foo4 <- data.frame(t(foo3))
       names_list <- c("URL", "Year", "Volume", "Issue", "Pages", "Journal", "Abstract", "Title")
       for (z in names_list) {
         name1 <- paste0(z, ":")
         foo5 <- which(grepl(name1, foo3))
-        colnames(foo4)[foo5] <- z 
+        colnames(foo4)[foo5] <- z
       }
       foo4[,-1] <- sub(".*?: ", "", as.matrix(foo4[,-1]))
       colnames(foo4)[grep("^X", colnames(foo4))] <- "Author"
@@ -676,32 +658,31 @@ for (yr in ectafiles) { #People of the future - you'll have to replace the lates
       m <- m+1
       o <- n
     }
-  }  
+  }
 }
 
 df_articles$Abstract<- gsub("Abstract:", "", df_articles$Abstract)
 
-#Some recent articles are missing year 
+#Some recent articles are missing year
 #df_articles$Year[df_articles$Year=="" & df_articles$Volume ==84] <- 2017
 sum(df_articles$Year=="")
 
 #I do not adjust for ReDIF characters, eg. \" instead of ", as it takes time and is currently unnecessary.
 
 #Eliminating prefaces and other amenities; Sorting
-ecta_df <- df_articles
-ecta_df <- unique(ecta_df)
-ecta_df <- subset(ecta_df, Title!='foreword' & Title!='editors\' introduction' & Title!='preface')
-delet_this <- "erratum|comment|minutes of the|report of the|corrigendum|Appendix|Comment|Comments|Reply|Corrigendum|Response|: A Correction|: Discussion."
+ecta_df <- df_articles %>% unique(.) %>% subset(., Title!='foreword' & Title!='editors\' introduction' & Title!='preface')
+delet_this <- paste0("erratum|comment|minutes of the|report of the|corrigendum|Appendix|",
+                     "Comment|Comments|Reply|Corrigendum|Response|: A Correction|: Discussion.")
 ecta_df$gr <- grepl(delet_this, ecta_df$Title)
 ecta_df <- ecta_df[!grepl(delet_this, ecta_df$Title),]
 ecta_df$gr <- NULL
 ecta_df$Year <- as.numeric(ecta_df$Year)
 ecta_df$Volume <- as.numeric(ecta_df$Volume)
-ecta_df$Issue <- as.numeric(ecta_df$Issue) 
-ecta_df <- ecta_df[with(ecta_df, order(Year, Volume, Issue, Pages)),] 
+ecta_df$Issue <- as.numeric(ecta_df$Issue)
+ecta_df <- ecta_df[with(ecta_df, order(Year, Volume, Issue, Pages)),]
 
 #Cleaning up
-rm(j, k, l, ll, lt, m, o, n, q, qt, z, foo, foo1, fool, foo2, foo3, url, url_cut, urli, ectafiles, foo5, name1, 
+rm(j, k, l, ll, lt, m, o, n, q, qt, z, foo, foo1, fool, foo2, foo3, url, url_cut, urli, ectafiles, foo5, name1,
    wly, ecm, foo4, names_list, upto, end, yr, vol, delet_this, nowant)
 rm(list = ls(pattern = "article"))
 
@@ -724,7 +705,7 @@ library('ggplot2')
 top5_df$Title <- tolower(top5_df$Title)
 top5_df$Evidence <- grepl("evidence from", top5_df$Title)
 frequency <- aggregate(top5_df$Evidence, by=list(Year=top5_df$Year, Journal=top5_df$Journal), FUN=sum)
-frequency <- subset(frequency, frequency$Year > 1969) 
+frequency <- subset(frequency, frequency$Year > 1969)
 
 #-->> 7.1 Graphing "evidence from" over time ----
 
@@ -732,10 +713,10 @@ frequency <- subset(frequency, frequency$Year > 1969)
 frequency_all <- aggregate(frequency$x, by=list(Year=frequency$Year), FUN=sum)
 frequency_all$events <- frequency_all$x
 
-print(histogram <- (ggplot(data=frequency_all, aes(x=frequency_all$Year, y=frequency_all$events, width=.7)) 
+print(histogram <- (ggplot(data=frequency_all, aes(x=frequency_all$Year, y=frequency_all$events, width=.7))
                     + geom_col(col="red",aes(fill= frequency_all$events), size=0) + xlab('Year of Publication') + ylab('Appearances in Top 5 Journals'))
-      + scale_x_continuous(breaks=c(seq(1970,2010,by=5),2017)) + scale_y_continuous(breaks=c(seq(0,40,by=5)), 
-                                                                    minor_breaks = seq(0,40, by=1)) + scale_fill_gradient("Count", low="green", high="red") 
+      + scale_x_continuous(breaks=c(seq(1970,2010,by=5),2017)) + scale_y_continuous(breaks=c(seq(0,40,by=5)),
+                                                                    minor_breaks = seq(0,40, by=1)) + scale_fill_gradient("Count", low="green", high="red")
       + guides(fill=guide_legend(title=NULL, reverse=T)) + ggtitle("Number of \"evidence from\" articles over the years")
       + theme(plot.title = element_text(lineheight=.8, face="bold", hjust = .5))
       + theme(legend.position=c(0,1), legend.justification=c(0, 1), legend.direction="vertical", legend.background = element_rect(colour = NA, fill = NA))
@@ -745,9 +726,9 @@ ggsave("frequency_all_hist.png")
 #By Journal
 frequency$events <- frequency$x
 frequency$journal <- reorder(frequency$Journal, frequency$events)
-print(histogram <- (ggplot(data=frequency, aes(x=frequency$Year, y=frequency$events, width=.7)) 
+print(histogram <- (ggplot(data=frequency, aes(x=frequency$Year, y=frequency$events, width=.7))
                     + geom_col(aes(fill= frequency$journal), size=0.25, color="black") + xlab('Year of Publication') + ylab('Appearances in Top 5 Journals'))
-      + scale_x_continuous(breaks=c(seq(1970,2010,by=5),2017)) + scale_y_continuous(breaks=c(seq(0,40,by=5)), 
+      + scale_x_continuous(breaks=c(seq(1970,2010,by=5),2017)) + scale_y_continuous(breaks=c(seq(0,40,by=5)),
          minor_breaks = seq(0,40, by=1))  + theme(legend.position=c(0,1), legend.justification=c(0, 1), legend.direction="vertical", legend.background = element_rect(colour = NA, fill = NA))
       + guides(fill=guide_legend(title=NULL, reverse=T)) + ggtitle("Number of \" evidence from\" articles over the years")
       + theme(plot.title = element_text(lineheight=.8, face="bold", hjust = .5)) + scale_fill_brewer(palette = "RdBu")
