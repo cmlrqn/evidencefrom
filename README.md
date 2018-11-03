@@ -19,7 +19,7 @@ For each article, the generated dataset should contain (where available):
 
 ## Limitations
 The limitations of the resulting dataset are mainly associated to limitations of the metadata. 
-For the American Economic Review, metadata are only [available for article from 1969 onwards](ftp://ftp.repec.org/opt/ReDIF/RePEc/aea/aecrev/). 
+For the American Economic Review, metadata are only available for article from [1969 onwards](<ftp://ftp.repec.org/opt/ReDIF/RePEc/aea/aecrev/>). 
 More generally, the files can contain orthographic errors that translate into errors in the dataset. 
 
 ## Motivation 
